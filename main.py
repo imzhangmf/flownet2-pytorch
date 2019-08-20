@@ -271,7 +271,10 @@ if __name__ == '__main__':
             loss_values = [v.item() for v in losses]
 
             # gather loss_labels, direct return leads to recursion limit error as it looks for variables to gather'
-            loss_labels = list(model.module.loss.loss_labels)
+            if type(model.module.loss.loss_labels) is tuple:
+                loss_labels = list(model.module.loss.loss_labels[0])
+            else:
+                loss_labels = list(model.module.loss.loss_labels)
 
             assert not np.isnan(total_loss)
 
