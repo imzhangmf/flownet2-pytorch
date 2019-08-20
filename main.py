@@ -310,19 +310,18 @@ if __name__ == '__main__':
 
             progress.set_description(title + ' ' + tools.format_dictionary_of_losses(loss_labels, statistics[-1]))
 
-            if ((((global_iteration + 1) % args.log_frequency) == 0 and not is_validate) or
-                (is_validate and batch_idx == args.validation_n_batches - 1)):
+            # if ((((global_iteration + 1) % args.log_frequency) == 0 and not is_validate) or
+            #     (is_validate and batch_idx == args.validation_n_batches - 1)):
 
-                global_iteration = global_iteration if not is_validate else start_iteration
 
-                logger.add_scalar('batch logs per second', len(statistics) / (progress._time() - last_log_time), global_iteration)
-                last_log_time = progress._time()
+            logger.add_scalar('batch logs per second', len(statistics) / (progress._time() - last_log_time), global_iteration)
+            last_log_time = progress._time()
 
-                all_losses = np.array(statistics)
+            all_losses = np.array(statistics)
 
-                for i, key in enumerate(loss_labels):
-                    logger.add_scalar('average batch ' + str(key), all_losses[:, i].mean(), global_iteration)
-                    logger.add_histogram(str(key), all_losses[:, i], global_iteration)
+            for i, key in enumerate(loss_labels):
+                logger.add_scalar('average batch ' + str(key), all_losses[:, i].mean(), global_iteration)
+                logger.add_histogram(str(key), all_losses[:, i], global_iteration)
 
             # Reset Summary
             statistics = []
@@ -397,6 +396,7 @@ if __name__ == '__main__':
     offset = 1
     last_epoch_time = progress._time()
     global_iteration = 0
+    val_iter = 0
 
     for epoch in progress:
         if args.inference or (args.render_validation and ((epoch - 1) % args.validation_frequency) == 0):
@@ -404,7 +404,8 @@ if __name__ == '__main__':
             offset += 1
 
         if not args.skip_validation and ((epoch - 1) % args.validation_frequency) == 0:
-            validation_loss, _ = train(args=args, epoch=epoch - 1, start_iteration=global_iteration, data_loader=validation_loader, model=model_and_loss, optimizer=optimizer, logger=validation_logger, is_validate=True, offset=offset)
+            validation_loss, val_it_perep = train(args=args, epoch=epoch - 1,start_iteration=val_iter, data_loader=validation_loader, model=model_and_loss, optimizer=optimizer, logger=validation_logger, is_validate=True, offset=offset)
+            val_iter += val_it_perep
             offset += 1
 
             is_best = False
