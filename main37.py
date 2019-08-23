@@ -202,6 +202,7 @@ if __name__ == '__main__':
             block.log('CUDA not being used')
             torch.manual_seed(args.seed)
 
+        load_param_tensor_number = 0
         # Load weights if needed, otherwise randomly initialize
         if args.resume and os.path.isfile(args.resume):
             block.log("Loading checkpoint '{}'".format(args.resume))
@@ -209,7 +210,10 @@ if __name__ == '__main__':
             if not args.inference:
                 args.start_epoch = checkpoint['epoch']
             best_err = checkpoint['best_EPE']
-            model_and_loss.module.model.load_state_dict(checkpoint['state_dict'])
+            model_and_loss.module.model.load_state_dict(checkpoint['state_dict'], strict=False) # strict=False
+            print("\033[1;33m ATTENTION! \033[0m")
+            print("load param tensor number: "+str(len(checkpoint['state_dict'])))
+            load_param_tensor_number = len(checkpoint['state_dict'])
             block.log("Loaded checkpoint '{}' (at epoch {})".format(args.resume, checkpoint['epoch']))
 
         elif args.resume and args.inference:
@@ -218,6 +222,28 @@ if __name__ == '__main__':
 
         else:
             block.log("Random initialization")
+
+        # zmf
+        count_grad_num = 0
+        for i,param in enumerate(model_and_loss.parameters()):
+            if (i < load_param_tensor_number): # 90 for cs
+                if (param.requires_grad == False):
+                    print("\033[1;33m ATTENTION! \033[0m")
+                    print("wrong111111111111111111111111111")
+                else:
+                    param.requires_grad = False
+            elif param.requires_grad == True:
+                count_grad_num += 1
+            else:
+                print("\033[1;33m ATTENTION! \033[0m")
+                print("wrong22222222222222222222222")
+        if (count_grad_num == len(model_and_loss.state_dict()) - load_param_tensor_number):
+            print("\033[1;33m ATTENTION! \033[0m")
+            print("left need grad tensor num: "+str(count_grad_num))
+        else:
+            print("\033[1;33m ATTENTION! \033[0m")
+            print("wrong33333333333333333333333")
+        # fmz
 
         block.log("Initializing save directory: {}".format(args.save))
         if not os.path.exists(args.save):
