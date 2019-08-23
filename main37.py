@@ -209,6 +209,8 @@ if __name__ == '__main__':
             checkpoint = torch.load(args.resume)
             if not args.inference:
                 args.start_epoch = checkpoint['epoch']
+            if args.start_epoch == 0:
+                args.start_epoch = 1
             best_err = checkpoint['best_EPE']
             model_and_loss.module.model.load_state_dict(checkpoint['state_dict'], strict=False) # strict=False
             print("\033[1;33m ATTENTION! \033[0m")
