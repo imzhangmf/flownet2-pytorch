@@ -262,228 +262,228 @@ if __name__ == '__main__':
         train_logger = SummaryWriter(log_dir = os.path.join(args.save, 'train'), comment = 'training')
         validation_logger = SummaryWriter(log_dir = os.path.join(args.save, 'validation'), comment = 'validation')
 
-    print("Model's state_dict:")
-    for param_tensor in model_and_loss.module.model.state_dict():
-        print(param_tensor)
-        print(model_and_loss.module.model.state_dict()[param_tensor])
+    # print("Model's state_dict:")
+    # for param_tensor in model_and_loss.module.model.state_dict():
+    #     print(param_tensor)
+    #     print(model_and_loss.module.model.state_dict()[param_tensor])
     
-    # # Dynamically load the optimizer with parameters passed in via "--optimizer_[param]=[value]" arguments 
-    # with tools.TimerBlock("Initializing {} Optimizer".format(args.optimizer)) as block:
-    #     kwargs = tools.kwargs_from_args(args, 'optimizer')
-    #     if args.fp16:
-    #         optimizer = args.optimizer_class([p for p in param_copy if p.requires_grad], **kwargs)
-    #     else:
-    #         optimizer = args.optimizer_class([p for p in model_and_loss.parameters() if p.requires_grad], **kwargs)
-    #     for param, default in list(kwargs.items()):
-    #         block.log("{} = {} ({})".format(param, default, type(default)))
+    # Dynamically load the optimizer with parameters passed in via "--optimizer_[param]=[value]" arguments 
+    with tools.TimerBlock("Initializing {} Optimizer".format(args.optimizer)) as block:
+        kwargs = tools.kwargs_from_args(args, 'optimizer')
+        if args.fp16:
+            optimizer = args.optimizer_class([p for p in param_copy if p.requires_grad], **kwargs)
+        else:
+            optimizer = args.optimizer_class([p for p in model_and_loss.parameters() if p.requires_grad], **kwargs)
+        for param, default in list(kwargs.items()):
+            block.log("{} = {} ({})".format(param, default, type(default)))
 
-    # # Log all arguments to file
-    # for argument, value in sorted(vars(args).items()):
-    #     block.log2file(args.log_file, '{}: {}'.format(argument, value))
+    # Log all arguments to file
+    for argument, value in sorted(vars(args).items()):
+        block.log2file(args.log_file, '{}: {}'.format(argument, value))
 
-    # # Reusable function for training and validataion
-    # def train(args, epoch, start_iteration, data_loader, model, optimizer, logger, is_validate=False, offset=0):
-    #     statistics = []
-    #     total_loss = 0
+    # Reusable function for training and validataion
+    def train(args, epoch, start_iteration, data_loader, model, optimizer, logger, is_validate=False, offset=0):
+        statistics = []
+        total_loss = 0
 
-    #     if is_validate:
-    #         model.eval()
-    #         title = 'Validating Epoch {}'.format(epoch)
-    #         args.validation_n_batches = np.inf if args.validation_n_batches < 0 else args.validation_n_batches
-    #         progress = tqdm(tools.IteratorTimer(data_loader), ncols=100, total=np.minimum(len(data_loader), args.validation_n_batches), leave=True, position=offset, desc=title)
-    #     else:
-    #         model.train()
-    #         title = 'Training Epoch {}'.format(epoch)
-    #         args.train_n_batches = np.inf if args.train_n_batches < 0 else args.train_n_batches
-    #         progress = tqdm(tools.IteratorTimer(data_loader), ncols=120, total=np.minimum(len(data_loader), args.train_n_batches), smoothing=.9, miniters=1, leave=True, position=offset, desc=title)
+        if is_validate:
+            model.eval()
+            title = 'Validating Epoch {}'.format(epoch)
+            args.validation_n_batches = np.inf if args.validation_n_batches < 0 else args.validation_n_batches
+            progress = tqdm(tools.IteratorTimer(data_loader), ncols=100, total=np.minimum(len(data_loader), args.validation_n_batches), leave=True, position=offset, desc=title)
+        else:
+            model.train()
+            title = 'Training Epoch {}'.format(epoch)
+            args.train_n_batches = np.inf if args.train_n_batches < 0 else args.train_n_batches
+            progress = tqdm(tools.IteratorTimer(data_loader), ncols=120, total=np.minimum(len(data_loader), args.train_n_batches), smoothing=.9, miniters=1, leave=True, position=offset, desc=title)
 
-    #     last_log_time = progress._time()
-    #     for batch_idx, (data, target) in enumerate(progress):
+        last_log_time = progress._time()
+        for batch_idx, (data, target) in enumerate(progress):
 
-    #         data, target = [Variable(d) for d in data], [Variable(t) for t in target]
-    #         if args.cuda and args.number_gpus == 1:
-    #             data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
+            data, target = [Variable(d) for d in data], [Variable(t) for t in target]
+            if args.cuda and args.number_gpus == 1:
+                data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
 
-    #         optimizer.zero_grad() if not is_validate else None
-    #         losses = model(data[0], target[0])
-    #         losses = [torch.mean(loss_value) for loss_value in losses] 
-    #         loss_val = losses[0] # Collect first loss for weight update
-    #         total_loss += loss_val.item()
-    #         loss_values = [v.item() for v in losses]
+            optimizer.zero_grad() if not is_validate else None
+            losses = model(data[0], target[0])
+            losses = [torch.mean(loss_value) for loss_value in losses] 
+            loss_val = losses[0] # Collect first loss for weight update
+            total_loss += loss_val.item()
+            loss_values = [v.item() for v in losses]
 
-    #         # gather loss_labels, direct return leads to recursion limit error as it looks for variables to gather'
-    #         if type(model.module.loss.loss_labels) is tuple:
-    #             loss_labels = list(model.module.loss.loss_labels[0])
-    #         else:
-    #             loss_labels = list(model.module.loss.loss_labels)
+            # gather loss_labels, direct return leads to recursion limit error as it looks for variables to gather'
+            if type(model.module.loss.loss_labels) is tuple:
+                loss_labels = list(model.module.loss.loss_labels[0])
+            else:
+                loss_labels = list(model.module.loss.loss_labels)
 
-    #         assert not np.isnan(total_loss)
+            assert not np.isnan(total_loss)
 
-    #         if not is_validate and args.fp16:
-    #             loss_val.backward()
-    #             if args.gradient_clip:
-    #                 torch.nn.utils.clip_grad_norm(model.parameters(), args.gradient_clip)
+            if not is_validate and args.fp16:
+                loss_val.backward()
+                if args.gradient_clip:
+                    torch.nn.utils.clip_grad_norm(model.parameters(), args.gradient_clip)
 
-    #             params = list(model.parameters())
-    #             for i in range(len(params)):
-    #                param_copy[i].grad = params[i].grad.clone().type_as(params[i]).detach()
-    #                param_copy[i].grad.mul_(1./args.loss_scale)
-    #             optimizer.step()
-    #             for i in range(len(params)):
-    #                 params[i].data.copy_(param_copy[i].data)
+                params = list(model.parameters())
+                for i in range(len(params)):
+                   param_copy[i].grad = params[i].grad.clone().type_as(params[i]).detach()
+                   param_copy[i].grad.mul_(1./args.loss_scale)
+                optimizer.step()
+                for i in range(len(params)):
+                    params[i].data.copy_(param_copy[i].data)
 
-    #         elif not is_validate:
-    #             loss_val.backward()
-    #             if args.gradient_clip:
-    #                 torch.nn.utils.clip_grad_norm(model.parameters(), args.gradient_clip)
-    #             optimizer.step()
+            elif not is_validate:
+                loss_val.backward()
+                if args.gradient_clip:
+                    torch.nn.utils.clip_grad_norm(model.parameters(), args.gradient_clip)
+                optimizer.step()
 
-    #         # Update hyperparameters if needed
-    #         global_iteration = start_iteration + batch_idx
-    #         if not is_validate:
-    #             tools.update_hyperparameter_schedule(args, epoch, global_iteration, optimizer)
-    #             loss_labels.append('lr')
-    #             loss_values.append(optimizer.param_groups[0]['lr'])
+            # Update hyperparameters if needed
+            global_iteration = start_iteration + batch_idx
+            if not is_validate:
+                tools.update_hyperparameter_schedule(args, epoch, global_iteration, optimizer)
+                loss_labels.append('lr')
+                loss_values.append(optimizer.param_groups[0]['lr'])
 
-    #         loss_labels.append('load')
-    #         loss_values.append(progress.iterable.last_duration)
+            loss_labels.append('load')
+            loss_values.append(progress.iterable.last_duration)
 
-    #         # Print out statistics
-    #         statistics.append(loss_values)
-    #         title = '{} Epoch {}'.format('Validating' if is_validate else 'Training', epoch)
+            # Print out statistics
+            statistics.append(loss_values)
+            title = '{} Epoch {}'.format('Validating' if is_validate else 'Training', epoch)
 
-    #         progress.set_description(title + ' ' + tools.format_dictionary_of_losses(loss_labels, statistics[-1]))
+            progress.set_description(title + ' ' + tools.format_dictionary_of_losses(loss_labels, statistics[-1]))
 
-    #         # if ((((global_iteration + 1) % args.log_frequency) == 0 and not is_validate) or
-    #         #     (is_validate and batch_idx == args.validation_n_batches - 1)):
+            # if ((((global_iteration + 1) % args.log_frequency) == 0 and not is_validate) or
+            #     (is_validate and batch_idx == args.validation_n_batches - 1)):
 
 
-    #         logger.add_scalar('batch logs per second', len(statistics) / (progress._time() - last_log_time), global_iteration)
-    #         last_log_time = progress._time()
+            logger.add_scalar('batch logs per second', len(statistics) / (progress._time() - last_log_time), global_iteration)
+            last_log_time = progress._time()
 
-    #         all_losses = np.array(statistics)
+            all_losses = np.array(statistics)
 
-    #         for i, key in enumerate(loss_labels):
-    #             logger.add_scalar('average batch ' + str(key), all_losses[:, i].mean(), global_iteration)
-    #             logger.add_histogram(str(key), all_losses[:, i], global_iteration)
+            for i, key in enumerate(loss_labels):
+                logger.add_scalar('average batch ' + str(key), all_losses[:, i].mean(), global_iteration)
+                logger.add_histogram(str(key), all_losses[:, i], global_iteration)
 
-    #         # Reset Summary
-    #         statistics = []
+            # Reset Summary
+            statistics = []
 
-    #         if ( is_validate and ( batch_idx == args.validation_n_batches) ):
-    #             break
+            if ( is_validate and ( batch_idx == args.validation_n_batches) ):
+                break
 
-    #         if ( (not is_validate) and (batch_idx == (args.train_n_batches)) ):
-    #             break
+            if ( (not is_validate) and (batch_idx == (args.train_n_batches)) ):
+                break
 
-    #     progress.close()
+        progress.close()
 
-    #     return total_loss / float(batch_idx + 1), (batch_idx + 1)
+        return total_loss / float(batch_idx + 1), (batch_idx + 1)
 
-    # # Reusable function for inference
-    # def inference(args, epoch, data_loader, model, offset=0):
+    # Reusable function for inference
+    def inference(args, epoch, data_loader, model, offset=0):
 
-    #     model.eval()
+        model.eval()
         
-    #     if args.save_flow or args.render_validation:
-    #         flow_folder = "{}/inference/{}.epoch-{}-flow-field".format(args.save,args.name.replace('/', '.'),epoch)
-    #         if not os.path.exists(flow_folder):
-    #             os.makedirs(flow_folder)
+        if args.save_flow or args.render_validation:
+            flow_folder = "{}/inference/{}.epoch-{}-flow-field".format(args.save,args.name.replace('/', '.'),epoch)
+            if not os.path.exists(flow_folder):
+                os.makedirs(flow_folder)
 
         
-    #     args.inference_n_batches = np.inf if args.inference_n_batches < 0 else args.inference_n_batches
+        args.inference_n_batches = np.inf if args.inference_n_batches < 0 else args.inference_n_batches
 
-    #     progress = tqdm(data_loader, ncols=100, total=np.minimum(len(data_loader), args.inference_n_batches), desc='Inferencing ', 
-    #         leave=True, position=offset)
+        progress = tqdm(data_loader, ncols=100, total=np.minimum(len(data_loader), args.inference_n_batches), desc='Inferencing ', 
+            leave=True, position=offset)
 
-    #     statistics = []
-    #     total_loss = 0
-    #     for batch_idx, (data, target) in enumerate(progress):
-    #         if args.cuda:
-    #             data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
-    #         data, target = [Variable(d) for d in data], [Variable(t) for t in target]
+        statistics = []
+        total_loss = 0
+        for batch_idx, (data, target) in enumerate(progress):
+            if args.cuda:
+                data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
+            data, target = [Variable(d) for d in data], [Variable(t) for t in target]
 
-    #         # when ground-truth flows are not available for inference_dataset, 
-    #         # the targets are set to all zeros. thus, losses are actually L1 or L2 norms of compute optical flows, 
-    #         # depending on the type of loss norm passed in
-    #         with torch.no_grad():
-    #             losses, output = model(data[0], target[0], inference=True)
+            # when ground-truth flows are not available for inference_dataset, 
+            # the targets are set to all zeros. thus, losses are actually L1 or L2 norms of compute optical flows, 
+            # depending on the type of loss norm passed in
+            with torch.no_grad():
+                losses, output = model(data[0], target[0], inference=True)
 
-    #         losses = [torch.mean(loss_value) for loss_value in losses] 
-    #         loss_val = losses[0] # Collect first loss for weight update
-    #         total_loss += loss_val.item()
-    #         loss_values = [v.item() for v in losses]
+            losses = [torch.mean(loss_value) for loss_value in losses] 
+            loss_val = losses[0] # Collect first loss for weight update
+            total_loss += loss_val.item()
+            loss_values = [v.item() for v in losses]
 
-    #         # gather loss_labels, direct return leads to recursion limit error as it looks for variables to gather'
-    #         loss_labels = list(model.module.loss.loss_labels)
+            # gather loss_labels, direct return leads to recursion limit error as it looks for variables to gather'
+            loss_labels = list(model.module.loss.loss_labels)
 
-    #         statistics.append(loss_values)
-    #         # import IPython; IPython.embed()
-    #         if args.save_flow or args.render_validation:
-    #             for i in range(args.inference_batch_size):
-    #                 _pflow = output[i].data.cpu().numpy().transpose(1, 2, 0)
-    #                 flow_utils.writeFlow( join(flow_folder, '%06d.flo'%(batch_idx * args.inference_batch_size + i)),  _pflow)
+            statistics.append(loss_values)
+            # import IPython; IPython.embed()
+            if args.save_flow or args.render_validation:
+                for i in range(args.inference_batch_size):
+                    _pflow = output[i].data.cpu().numpy().transpose(1, 2, 0)
+                    flow_utils.writeFlow( join(flow_folder, '%06d.flo'%(batch_idx * args.inference_batch_size + i)),  _pflow)
 
-    #         progress.set_description('Inference Averages for Epoch {}: '.format(epoch) + tools.format_dictionary_of_losses(loss_labels, np.array(statistics).mean(axis=0)))
-    #         progress.update(1)
+            progress.set_description('Inference Averages for Epoch {}: '.format(epoch) + tools.format_dictionary_of_losses(loss_labels, np.array(statistics).mean(axis=0)))
+            progress.update(1)
 
-    #         if batch_idx == (args.inference_n_batches - 1):
-    #             break
+            if batch_idx == (args.inference_n_batches - 1):
+                break
 
-    #     progress.close()
+        progress.close()
 
-    #     return
+        return
 
-    # # Primary epoch loop
-    # best_err = 1e8
-    # progress = tqdm(list(range(args.start_epoch, args.total_epochs + 1)), miniters=1, ncols=100, desc='Overall Progress', leave=True, position=0)
-    # offset = 1
-    # last_epoch_time = progress._time()
-    # global_iteration = 0
-    # val_iter = 0
+    # Primary epoch loop
+    best_err = 1e8
+    progress = tqdm(list(range(args.start_epoch, args.total_epochs + 1)), miniters=1, ncols=100, desc='Overall Progress', leave=True, position=0)
+    offset = 1
+    last_epoch_time = progress._time()
+    global_iteration = 0
+    val_iter = 0
 
-    # for epoch in progress:
-    #     if args.inference or (args.render_validation and ((epoch - 1) % args.validation_frequency) == 0):
-    #         stats = inference(args=args, epoch=epoch - 1, data_loader=inference_loader, model=model_and_loss, offset=offset)
-    #         offset += 1
+    for epoch in progress:
+        if args.inference or (args.render_validation and ((epoch - 1) % args.validation_frequency) == 0):
+            stats = inference(args=args, epoch=epoch - 1, data_loader=inference_loader, model=model_and_loss, offset=offset)
+            offset += 1
 
-    #     if not args.skip_validation and ((epoch - 1) % args.validation_frequency) == 0:
-    #         validation_loss, val_it_perep = train(args=args, epoch=epoch - 1,start_iteration=val_iter, data_loader=validation_loader, model=model_and_loss, optimizer=optimizer, logger=validation_logger, is_validate=True, offset=offset)
-    #         val_iter += val_it_perep
-    #         offset += 1
+        if not args.skip_validation and ((epoch - 1) % args.validation_frequency) == 0:
+            validation_loss, val_it_perep = train(args=args, epoch=epoch - 1,start_iteration=val_iter, data_loader=validation_loader, model=model_and_loss, optimizer=optimizer, logger=validation_logger, is_validate=True, offset=offset)
+            val_iter += val_it_perep
+            offset += 1
 
-    #         is_best = False
-    #         if validation_loss < best_err:
-    #             best_err = validation_loss
-    #             is_best = True
+            is_best = False
+            if validation_loss < best_err:
+                best_err = validation_loss
+                is_best = True
 
-    #         checkpoint_progress = tqdm(ncols=100, desc='Saving Checkpoint', position=offset)
-    #         tools.save_checkpoint({   'arch' : args.model,
-    #                                   'epoch': epoch,
-    #                                   'state_dict': model_and_loss.module.model.state_dict(),
-    #                                   'best_EPE': best_err}, 
-    #                                   is_best, args.save, args.model)
-    #         checkpoint_progress.update(1)
-    #         checkpoint_progress.close()
-    #         offset += 1
+            checkpoint_progress = tqdm(ncols=100, desc='Saving Checkpoint', position=offset)
+            tools.save_checkpoint({   'arch' : args.model,
+                                      'epoch': epoch,
+                                      'state_dict': model_and_loss.module.model.state_dict(),
+                                      'best_EPE': best_err}, 
+                                      is_best, args.save, args.model)
+            checkpoint_progress.update(1)
+            checkpoint_progress.close()
+            offset += 1
 
-    #     if not args.skip_training:
-    #         train_loss, iterations = train(args=args, epoch=epoch, start_iteration=global_iteration, data_loader=train_loader, model=model_and_loss, optimizer=optimizer, logger=train_logger, offset=offset)
-    #         global_iteration += iterations
-    #         offset += 1
+        if not args.skip_training:
+            train_loss, iterations = train(args=args, epoch=epoch, start_iteration=global_iteration, data_loader=train_loader, model=model_and_loss, optimizer=optimizer, logger=train_logger, offset=offset)
+            global_iteration += iterations
+            offset += 1
 
-    #         # save checkpoint after every validation_frequency number of epochs
-    #         if ((epoch - 1) % args.validation_frequency) == 0:
-    #             checkpoint_progress = tqdm(ncols=100, desc='Saving Checkpoint', position=offset)
-    #             tools.save_checkpoint({   'arch' : args.model,
-    #                                       'epoch': epoch,
-    #                                       'state_dict': model_and_loss.module.model.state_dict(),
-    #                                       'best_EPE': train_loss}, 
-    #                                       False, args.save, args.model, filename = 'train-checkpoint.pth.tar')
-    #             checkpoint_progress.update(1)
-    #             checkpoint_progress.close()
+            # save checkpoint after every validation_frequency number of epochs
+            if ((epoch - 1) % args.validation_frequency) == 0:
+                checkpoint_progress = tqdm(ncols=100, desc='Saving Checkpoint', position=offset)
+                tools.save_checkpoint({   'arch' : args.model,
+                                          'epoch': epoch,
+                                          'state_dict': model_and_loss.module.model.state_dict(),
+                                          'best_EPE': train_loss}, 
+                                          False, args.save, args.model, filename = 'train-checkpoint.pth.tar')
+                checkpoint_progress.update(1)
+                checkpoint_progress.close()
 
 
-    #     train_logger.add_scalar('seconds per epoch', progress._time() - last_epoch_time, epoch)
-    #     last_epoch_time = progress._time()
-    # print("\n")
+        train_logger.add_scalar('seconds per epoch', progress._time() - last_epoch_time, epoch)
+        last_epoch_time = progress._time()
+    print("\n")
