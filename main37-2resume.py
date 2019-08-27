@@ -224,7 +224,7 @@ if __name__ == '__main__':
             print("ft param tensor number: "+str(len(checkpoint2['state_dict'])-len(checkpoint['state_dict'])))
             ft_param_tensor_number = len(checkpoint2['state_dict'])-len(checkpoint['state_dict'])
             block.log("Loaded checkpoint '{}' (at epoch {})".format(args.resume, checkpoint['epoch']))
-            block.log("Loaded checkpoint '{}' (at epoch {})".format(args.resume2, checkpoint['epoch']))
+            block.log("Loaded checkpoint '{}' (at epoch {})".format(args.resume2, checkpoint2['epoch']))
 
         elif args.resume and args.inference:
             block.log("No checkpoint found at '{}'".format(args.resume))
