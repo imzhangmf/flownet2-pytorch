@@ -38,7 +38,7 @@ if __name__ == '__main__':
     # dict = torch.load("../data/FlowNet2_checkpoint.pth.tar")
     # print(dict["state_dict"])
     net.load_state_dict(dict["state_dict"])
-
+    
     #load the image pair, you can find this operation in dataset.py
     pim1 = read_gen(imAddr1)
     pim2 = read_gen(imAddr2)
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     #process the image pair to obtian the flow 
     result = net(im)[0].squeeze()
 
-
+    
     #save flow, I reference the code in scripts/run-flownet.py in flownet2-caffe project 
     def writeFlow(name, flow):
         f = open(name, 'wb')

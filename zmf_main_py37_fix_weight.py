@@ -64,16 +64,16 @@ if __name__ == '__main__':
     tools.add_arguments_for_module(parser, losses, argument_for_class='loss', default='L1Loss')
 
     tools.add_arguments_for_module(parser, torch.optim, argument_for_class='optimizer', default='Adam', skip_params=['params'])
-    
+
     tools.add_arguments_for_module(parser, datasets, argument_for_class='training_dataset', default='MpiSintelFinal', 
                                     skip_params=['is_cropped'],
                                     parameter_defaults={'root': './MPI-Sintel/flow/training'})
-    
+
     tools.add_arguments_for_module(parser, datasets, argument_for_class='validation_dataset', default='MpiSintelClean', 
                                     skip_params=['is_cropped'],
                                     parameter_defaults={'root': './MPI-Sintel/flow/training',
                                                         'replicates': 1})
-    
+
     tools.add_arguments_for_module(parser, datasets, argument_for_class='inference_dataset', default='MpiSintelClean', 
                                     skip_params=['is_cropped'],
                                     parameter_defaults={'root': './MPI-Sintel/flow/training',
@@ -165,7 +165,7 @@ if __name__ == '__main__':
                 self.model = args.model_class(args, **kwargs)
                 kwargs = tools.kwargs_from_args(args, 'loss')
                 self.loss = args.loss_class(args, **kwargs)
-                
+
             def forward(self, data, target, inference=False ):
                 output = self.model(data)
 
@@ -202,14 +202,25 @@ if __name__ == '__main__':
             block.log('CUDA not being used')
             torch.manual_seed(args.seed)
 
+        load_param_tensor_number = 0 # zmf add this line
         # Load weights if needed, otherwise randomly initialize
         if args.resume and os.path.isfile(args.resume):
             block.log("Loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
             if not args.inference:
                 args.start_epoch = checkpoint['epoch']
+            # zmf: resume from 1      
+            if args.start_epoch == 0:
+                args.start_epoch = 1
+            # fmz
             best_err = checkpoint['best_EPE']
-            model_and_loss.module.model.load_state_dict(checkpoint['state_dict'])
+            # zmf: get the num of tensors need to be freezed            
+            # model_and_loss.module.model.load_state_dict(checkpoint['state_dict'])
+            model_and_loss.module.model.load_state_dict(checkpoint['state_dict'], strict=False)
+            print("\033[1;33m ATTENTION! \033[0m")
+            print("load param tensor number: "+str(len(checkpoint['state_dict'])))
+            load_param_tensor_number = len(checkpoint['state_dict'])
+            # fmz
             block.log("Loaded checkpoint '{}' (at epoch {})".format(args.resume, checkpoint['epoch']))
 
         elif args.resume and args.inference:
@@ -219,12 +230,37 @@ if __name__ == '__main__':
         else:
             block.log("Random initialization")
 
+        # zmf: freeze weights
+        count_grad_num = 0
+        for i,param in enumerate(model_and_loss.parameters()):
+            if (i < load_param_tensor_number): # 90 for cs
+                if (param.requires_grad == False):
+                    print("not cool, they should be True originally")
+                else:
+                    param.requires_grad = False # freeze!
+            elif param.requires_grad == True:
+                count_grad_num += 1
+            else:
+                print("should not reach here")
+        if (count_grad_num == len(model_and_loss.state_dict()) - load_param_tensor_number): # should train = all - freeze
+            print("left need grad tensor num: "+str(count_grad_num))
+        else:
+            print("should not reach here")
+        # fmz
+
         block.log("Initializing save directory: {}".format(args.save))
         if not os.path.exists(args.save):
             os.makedirs(args.save)
 
         train_logger = SummaryWriter(log_dir = os.path.join(args.save, 'train'), comment = 'training')
         validation_logger = SummaryWriter(log_dir = os.path.join(args.save, 'validation'), comment = 'validation')
+
+    # zmf: print Model's state_dict
+    # print("Model's state_dict:")
+    # for param_tensor in model_and_loss.module.model.state_dict():
+    #     print(param_tensor)
+    #     print(model_and_loss.module.model.state_dict()[param_tensor])
+    # fmz
 
     # Dynamically load the optimizer with parameters passed in via "--optimizer_[param]=[value]" arguments 
     with tools.TimerBlock("Initializing {} Optimizer".format(args.optimizer)) as block:
@@ -261,7 +297,7 @@ if __name__ == '__main__':
 
             data, target = [Variable(d) for d in data], [Variable(t) for t in target]
             if args.cuda and args.number_gpus == 1:
-                data, target = [d.cuda(async=True) for d in data], [t.cuda(async=True) for t in target]
+                data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
 
             optimizer.zero_grad() if not is_validate else None
             losses = model(data[0], target[0])
@@ -271,7 +307,10 @@ if __name__ == '__main__':
             loss_values = [v.item() for v in losses]
 
             # gather loss_labels, direct return leads to recursion limit error as it looks for variables to gather'
-            loss_labels = list(model.module.loss.loss_labels)
+            if type(model.module.loss.loss_labels) is tuple:
+                loss_labels = list(model.module.loss.loss_labels[0])
+            else:
+                loss_labels = list(model.module.loss.loss_labels)
 
             assert not np.isnan(total_loss)
 
@@ -310,19 +349,18 @@ if __name__ == '__main__':
 
             progress.set_description(title + ' ' + tools.format_dictionary_of_losses(loss_labels, statistics[-1]))
 
-            if ((((global_iteration + 1) % args.log_frequency) == 0 and not is_validate) or
-                (is_validate and batch_idx == args.validation_n_batches - 1)):
+            # if ((((global_iteration + 1) % args.log_frequency) == 0 and not is_validate) or
+            #     (is_validate and batch_idx == args.validation_n_batches - 1)):
 
-                global_iteration = global_iteration if not is_validate else start_iteration
 
-                logger.add_scalar('batch logs per second', len(statistics) / (progress._time() - last_log_time), global_iteration)
-                last_log_time = progress._time()
+            logger.add_scalar('batch logs per second', len(statistics) / (progress._time() - last_log_time), global_iteration)
+            last_log_time = progress._time()
 
-                all_losses = np.array(statistics)
+            all_losses = np.array(statistics)
 
-                for i, key in enumerate(loss_labels):
-                    logger.add_scalar('average batch ' + str(key), all_losses[:, i].mean(), global_iteration)
-                    logger.add_histogram(str(key), all_losses[:, i], global_iteration)
+            for i, key in enumerate(loss_labels):
+                logger.add_scalar('average batch ' + str(key), all_losses[:, i].mean(), global_iteration)
+                logger.add_histogram(str(key), all_losses[:, i], global_iteration)
 
             # Reset Summary
             statistics = []
@@ -341,13 +379,13 @@ if __name__ == '__main__':
     def inference(args, epoch, data_loader, model, offset=0):
 
         model.eval()
-        
+
         if args.save_flow or args.render_validation:
             flow_folder = "{}/inference/{}.epoch-{}-flow-field".format(args.save,args.name.replace('/', '.'),epoch)
             if not os.path.exists(flow_folder):
                 os.makedirs(flow_folder)
 
-        
+
         args.inference_n_batches = np.inf if args.inference_n_batches < 0 else args.inference_n_batches
 
         progress = tqdm(data_loader, ncols=100, total=np.minimum(len(data_loader), args.inference_n_batches), desc='Inferencing ', 
@@ -357,7 +395,7 @@ if __name__ == '__main__':
         total_loss = 0
         for batch_idx, (data, target) in enumerate(progress):
             if args.cuda:
-                data, target = [d.cuda(async=True) for d in data], [t.cuda(async=True) for t in target]
+                data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
             data, target = [Variable(d) for d in data], [Variable(t) for t in target]
 
             # when ground-truth flows are not available for inference_dataset, 
@@ -397,6 +435,7 @@ if __name__ == '__main__':
     offset = 1
     last_epoch_time = progress._time()
     global_iteration = 0
+    val_iter = 0
 
     for epoch in progress:
         if args.inference or (args.render_validation and ((epoch - 1) % args.validation_frequency) == 0):
@@ -404,7 +443,8 @@ if __name__ == '__main__':
             offset += 1
 
         if not args.skip_validation and ((epoch - 1) % args.validation_frequency) == 0:
-            validation_loss, _ = train(args=args, epoch=epoch - 1, start_iteration=global_iteration, data_loader=validation_loader, model=model_and_loss, optimizer=optimizer, logger=validation_logger, is_validate=True, offset=offset)
+            validation_loss, val_it_perep = train(args=args, epoch=epoch - 1,start_iteration=val_iter, data_loader=validation_loader, model=model_and_loss, optimizer=optimizer, logger=validation_logger, is_validate=True, offset=offset)
+            val_iter += val_it_perep
             offset += 1
 
             is_best = False

@@ -208,6 +208,10 @@ if __name__ == '__main__':
             checkpoint = torch.load(args.resume)
             if not args.inference:
                 args.start_epoch = checkpoint['epoch']
+            # zmf: resume from 1      
+            if args.start_epoch == 0:
+                args.start_epoch = 1
+            # fmz
             best_err = checkpoint['best_EPE']
             model_and_loss.module.model.load_state_dict(checkpoint['state_dict'])
             block.log("Loaded checkpoint '{}' (at epoch {})".format(args.resume, checkpoint['epoch']))
@@ -271,7 +275,13 @@ if __name__ == '__main__':
             loss_values = [v.item() for v in losses]
 
             # gather loss_labels, direct return leads to recursion limit error as it looks for variables to gather'
-            loss_labels = list(model.module.loss.loss_labels)
+            # zmf: fix output bug
+            # loss_labels = list(model.module.loss.loss_labels)
+            if type(model.module.loss.loss_labels) is tuple:
+                loss_labels = list(model.module.loss.loss_labels[0])
+            else:
+                loss_labels = list(model.module.loss.loss_labels)
+            # fmz
 
             assert not np.isnan(total_loss)
 
@@ -310,19 +320,21 @@ if __name__ == '__main__':
 
             progress.set_description(title + ' ' + tools.format_dictionary_of_losses(loss_labels, statistics[-1]))
 
-            if ((((global_iteration + 1) % args.log_frequency) == 0 and not is_validate) or
-                (is_validate and batch_idx == args.validation_n_batches - 1)):
+            # zmf: change to log val every batch (move out of 'if')
+            # if ((((global_iteration + 1) % args.log_frequency) == 0 and not is_validate) or
+            #     (is_validate and batch_idx == args.validation_n_batches - 1)):
 
-                global_iteration = global_iteration if not is_validate else start_iteration
+            #     global_iteration = global_iteration if not is_validate else start_iteration
 
-                logger.add_scalar('batch logs per second', len(statistics) / (progress._time() - last_log_time), global_iteration)
-                last_log_time = progress._time()
+            logger.add_scalar('batch logs per second', len(statistics) / (progress._time() - last_log_time), global_iteration)
+            last_log_time = progress._time()
 
-                all_losses = np.array(statistics)
+            all_losses = np.array(statistics)
 
-                for i, key in enumerate(loss_labels):
-                    logger.add_scalar('average batch ' + str(key), all_losses[:, i].mean(), global_iteration)
-                    logger.add_histogram(str(key), all_losses[:, i], global_iteration)
+            for i, key in enumerate(loss_labels):
+                logger.add_scalar('average batch ' + str(key), all_losses[:, i].mean(), global_iteration)
+                logger.add_histogram(str(key), all_losses[:, i], global_iteration)
+            # fmz
 
             # Reset Summary
             statistics = []
@@ -397,6 +409,7 @@ if __name__ == '__main__':
     offset = 1
     last_epoch_time = progress._time()
     global_iteration = 0
+    val_iter = 0 # zmf add this line
 
     for epoch in progress:
         if args.inference or (args.render_validation and ((epoch - 1) % args.validation_frequency) == 0):
@@ -404,7 +417,11 @@ if __name__ == '__main__':
             offset += 1
 
         if not args.skip_validation and ((epoch - 1) % args.validation_frequency) == 0:
-            validation_loss, _ = train(args=args, epoch=epoch - 1, start_iteration=global_iteration, data_loader=validation_loader, model=model_and_loss, optimizer=optimizer, logger=validation_logger, is_validate=True, offset=offset)
+            # zmf
+            # validation_loss, _ = train(args=args, epoch=epoch - 1, start_iteration=global_iteration, data_loader=validation_loader, model=model_and_loss, optimizer=optimizer, logger=validation_logger, is_validate=True, offset=offset)
+            validation_loss, val_it_perep = train(args=args, epoch=epoch - 1, start_iteration=global_iteration, data_loader=validation_loader, model=model_and_loss, optimizer=optimizer, logger=validation_logger, is_validate=True, offset=offset)
+            val_iter += val_it_perep
+            # fmz
             offset += 1
 
             is_best = False

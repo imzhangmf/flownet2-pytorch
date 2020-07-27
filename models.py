@@ -29,7 +29,8 @@ except:
 
 class FlowNet2(nn.Module):
 
-    def __init__(self, args, batchNorm=False, div_flow = 20.):
+    def __init__(self, args, batchNorm=False, div_flow = 20.): 
+    # zmf: the author said that if train the whole flownet2 all together, turn the batchNorm on
         super(FlowNet2,self).__init__()
         self.batchNorm = batchNorm
         self.div_flow = div_flow
