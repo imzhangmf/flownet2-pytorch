@@ -4,7 +4,7 @@ zmf_main.py - fix bug to log val per batch; fix output format bug; fix resume fr
 
 zmf_main_py37.py - to work in python 3.7
 
-zmf_main_py37_fix_weight.py - to train the whole model step by step, freese part of the weights and train the other part; able to print the model's state dict
+zmf_main_py37_freeze_weight.py - to train the whole model step by step, freeze part of the weights and train the other part; able to print the model's state dict
 
 zmf_main_py37_2resume.py - to resume training from 2 checkpoints
 
