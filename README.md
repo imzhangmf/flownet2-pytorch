@@ -10,6 +10,8 @@ zmf_main_py37_2resume.py - to resume training from 2 checkpoints
 
 zmf_run_a_pair.py - test with a pair of images
 
+zmf_runtest.py - zmf test program
+
 zmf_seeTensors - see tensors
 
 zmf_test - test programs
