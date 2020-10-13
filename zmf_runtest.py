@@ -58,18 +58,20 @@ def calc_and_save_flow(imAddr1, imAddr2, outAddr):
 
 import itertools
 
-list1 = range(11,14+1)
+list1 = range(1,5+1)
 perm1 = itertools.permutations(list1,2)
-list2 = range(21,24+1)
+list2 = range(11,14+1)
 perm2 = itertools.permutations(list2,2)
-list3 = range(31,34+1)
+list3 = range(21,24+1)
 perm3 = itertools.permutations(list3,2)
-list4 = range(41,44+1)
+list4 = range(31,34+1)
 perm4 = itertools.permutations(list4,2)
-list5 = range(51,54+1)
+list5 = range(41,44+1)
 perm5 = itertools.permutations(list5,2)
+list6 = range(51,54+1)
+perm6 = itertools.permutations(list6,2)
 
-perm = list(perm1)+list(perm2)+list(perm3)+list(perm4)+list(perm5)
+perm = list(perm1)+list(perm2)+list(perm3)+list(perm4)+list(perm5)+list(perm6)
 
 # print(perm)
 
@@ -78,63 +80,8 @@ for ab in perm:
     ima = ab[0]
     imb = ab[1]
 
-    ad1 = '../../../Desktop/Nikon/scaled_jpg/%d_1.jpg'%ima
-    ad2 = '../../../Desktop/Nikon/scaled_jpg/%d_1.jpg'%imb
-    outad = '../../../Desktop/Nikon/GT/%d-%d.flo'%(ima,imb)
+    ad1 = '../../../Desktop/Nikon2/scaled_jpg/%d_1.jpg'%ima
+    ad2 = '../../../Desktop/Nikon2/scaled_jpg/%d_1.jpg'%imb
+    outad = '../../../Desktop/Nikon2/GT/%d-%d.flo'%(ima,imb)
     print(outad)
     calc_and_save_flow(ad1,ad2,outad)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# all_files = []
-# all_files += glob.glob(input_folder+"/*.ppm")
-# all_files += glob.glob(input_folder+"/*/*.ppm")
-# all_files += glob.glob(input_folder+"/*/*/*.ppm")
-# all_files = sorted(all_files, key=lambda name: name)
-# print("Explored ppm files depth = 3")
-# # print(all_files)
-
-# imAddr1 = ''
-# imAddr2 = ''
-# tempAddr = ''
-# for addr in all_files:
-#     file_name = os.path.basename(addr)
-#     father_addr_len = len(addr) - len(file_name)
-#     father_addr = addr[0:father_addr_len]
-
-#     if addr[-5] == '1':
-#         imAddr1 = addr
-    
-#     if addr[-5] == '2':
-#         imAddr2 = addr
-#         print("Processing:")
-#         print(imAddr1)
-#         print(imAddr2)
-
-#         outAddr = imAddr1[0:-9] + ".flo"
-#         calc_and_save_flow(imAddr1, imAddr2, outAddr)
-#         # print(outAddr)
-
-#         postProcess = 'python -m flowiz ' + outAddr
-#         subprocess.call(postProcess, shell=True)
-
-#         out_flo = outAddr
-#         gt_flo = input_folder + '/gt/' + os.path.basename(outAddr)[0:-4] + '_flow.flo' # 00001_flow.flo
-#         flow1 = readFlow(out_flo)
-#         flow2 = readFlow(gt_flo)
-#         tensorFlow1 = torch.from_numpy(flow1)
-#         tensorFlow2 = torch.from_numpy(flow2)
-#         err = EPE(tensorFlow1,tensorFlow2).numpy()
-#         subprocess.call('echo ' + str(err) + ' >> ' + father_addr + '/epe.txt', shell=True)
